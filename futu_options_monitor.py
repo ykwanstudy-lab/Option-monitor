@@ -29,10 +29,13 @@ import os
 CONTRACT_MULTIPLIER = 100 
 RISK_FREE_RATE = 0.04  # Placeholder annual risk-free rate (e.g., 3%)
 
-# Telegram Configuration
-TELEGRAM_BOT_TOKEN = "7563047990:AAEZ6KYrHqIqTHkM_L5dnUZosUR1YyKiQSc"
-TELEGRAM_CHAT_ID = "6998052102"
-ENABLE_TELEGRAM = True  # Telegram notifications are now enabled
+# Telegram Configuration (read from environment for security)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+ENABLE_TELEGRAM = os.getenv("ENABLE_TELEGRAM", "false").lower() in ("1", "true", "yes", "on")
+if ENABLE_TELEGRAM and (not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID):
+    print("Telegram enabled but BOT token or CHAT ID missing; disabling notifications.")
+    ENABLE_TELEGRAM = False
 
 # Data saving configuration
 ALERTS_DIR = "alerts_history"
@@ -56,32 +59,45 @@ previous_values = {
 # --- Futu API Connection ---
 try:
     from futu import *
-    # Define constants if not imported properly
     if 'RET_OK' not in globals():
         RET_OK = 0
-    # Use the imported OptionType if available, otherwise define our own
+    # Ensure OptionType exists even if partially imported
     try:
-        _ = OptionType.CALL  # Test if OptionType is properly imported
+        _ = OptionType.CALL
     except (NameError, AttributeError):
-        class OptionType:
+        class OptionType:  # type: ignore
             CALL = 1
             PUT = 2
-    
-    HOST = '127.0.0.1'
-    PORT = 11111
-    quote_ctx = OpenQuoteContext(host=HOST, port=PORT)
-    if quote_ctx:
-        print(f"Successfully connected to FutuOpenD at {HOST}:{PORT}")
-    else:
-        print(f"Failed to connect to FutuOpenD at {HOST}:{PORT}. Exiting.")
-        exit()
+
+    HOST = os.getenv('FUTU_HOST', '127.0.0.1')
+    PORT = int(os.getenv('FUTU_PORT', '11111'))
+    try:
+        quote_ctx = OpenQuoteContext(host=HOST, port=PORT)
+        if quote_ctx:
+            print(f"Successfully connected to FutuOpenD at {HOST}:{PORT}")
+        else:
+            print(f"Failed to connect to FutuOpenD at {HOST}:{PORT}. Continuing without live quotes.")
+            quote_ctx = None
+    except Exception as e:
+        print(f"Failed to initialize Futu OpenQuoteContext: {e}")
+        print("Continuing without live quotes. Some features will be limited.")
+        quote_ctx = None
 except ImportError:
-    print("Futu API library not found. Please install it: pip install futu-api")
-    exit()
+    print("Futu API library not found. Continuing without live quotes. To enable: pip install futu-api")
+    RET_OK = 0
+    class OptionType:  # type: ignore
+        CALL = 1
+        PUT = 2
+    quote_ctx = None
 except Exception as e:
-    print(f"Error connecting to FutuOpenD: {e}")
-    print("Ensure FutuOpenD is running and configured correctly (FutuOpenD.xml).")
-    exit()
+    print(f"Unexpected error during Futu setup: {e}")
+    print("Continuing without live quotes. Some features will be limited.")
+    RET_OK = 0
+    if 'OptionType' not in globals():
+        class OptionType:  # type: ignore
+            CALL = 1
+            PUT = 2
+    quote_ctx = None
 
 # --- Black-Scholes Model ---
 def N(x):
