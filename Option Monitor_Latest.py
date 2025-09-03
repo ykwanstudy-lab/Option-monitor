@@ -668,7 +668,8 @@ class OptionsMonitorGUI:
         pnl_upper_frame = ttk.Frame(pnl_frame)
         pnl_upper_frame.pack(fill='x', padx=5, pady=2)
         ttk.Label(pnl_upper_frame, text="Upper:", width=8).pack(side=tk.LEFT)
-        self.pnl_upper_threshold_var = tk.StringVar(value="")
+        # Keep existing StringVar; avoid re-binding
+        self.pnl_upper_threshold_var.set(self.pnl_upper_threshold_var.get())
         ttk.Entry(pnl_upper_frame, textvariable=self.pnl_upper_threshold_var, width=8).pack(side=tk.LEFT, padx=2)
         ttk.Button(pnl_upper_frame, text="Clear", width=6,
                    command=lambda: self.pnl_upper_threshold_var.set("")).pack(side=tk.LEFT, padx=2)
@@ -677,7 +678,8 @@ class OptionsMonitorGUI:
         pnl_lower_frame = ttk.Frame(pnl_frame)
         pnl_lower_frame.pack(fill='x', padx=5, pady=2)
         ttk.Label(pnl_lower_frame, text="Lower:", width=8).pack(side=tk.LEFT)
-        self.pnl_lower_threshold_var = tk.StringVar(value="")
+        # Keep existing StringVar; avoid re-binding
+        self.pnl_lower_threshold_var.set(self.pnl_lower_threshold_var.get())
         ttk.Entry(pnl_lower_frame, textvariable=self.pnl_lower_threshold_var, width=8).pack(side=tk.LEFT, padx=2)
         ttk.Button(pnl_lower_frame, text="Clear", width=6,
                    command=lambda: self.pnl_lower_threshold_var.set("")).pack(side=tk.LEFT, padx=2)
@@ -686,7 +688,8 @@ class OptionsMonitorGUI:
         pnl_remark_frame = ttk.Frame(pnl_frame)
         pnl_remark_frame.pack(fill='x', padx=5, pady=2)
         ttk.Label(pnl_remark_frame, text="Remark:").pack(side=tk.LEFT)
-        self.pnl_remark_var = tk.StringVar(value="")
+        # Keep existing StringVar; avoid re-binding
+        self.pnl_remark_var.set(self.pnl_remark_var.get())
         ttk.Entry(pnl_remark_frame, textvariable=self.pnl_remark_var, width=30).pack(side=tk.LEFT, padx=2, fill='x', expand=True)
         
         # Delta threshold settings
@@ -697,7 +700,8 @@ class OptionsMonitorGUI:
         delta_upper_frame = ttk.Frame(delta_frame)
         delta_upper_frame.pack(fill='x', padx=5, pady=2)
         ttk.Label(delta_upper_frame, text="Upper:", width=8).pack(side=tk.LEFT)
-        self.delta_upper_threshold_var = tk.StringVar(value="")
+        # Keep existing StringVar; avoid re-binding
+        self.delta_upper_threshold_var.set(self.delta_upper_threshold_var.get())
         ttk.Entry(delta_upper_frame, textvariable=self.delta_upper_threshold_var, width=8).pack(side=tk.LEFT, padx=2)
         ttk.Button(delta_upper_frame, text="Clear", width=6,
                    command=lambda: self.delta_upper_threshold_var.set("")).pack(side=tk.LEFT, padx=2)
@@ -706,7 +710,8 @@ class OptionsMonitorGUI:
         delta_lower_frame = ttk.Frame(delta_frame)
         delta_lower_frame.pack(fill='x', padx=5, pady=2)
         ttk.Label(delta_lower_frame, text="Lower:", width=8).pack(side=tk.LEFT)
-        self.delta_lower_threshold_var = tk.StringVar(value="")
+        # Keep existing StringVar; avoid re-binding
+        self.delta_lower_threshold_var.set(self.delta_lower_threshold_var.get())
         ttk.Entry(delta_lower_frame, textvariable=self.delta_lower_threshold_var, width=8).pack(side=tk.LEFT, padx=2)
         ttk.Button(delta_lower_frame, text="Clear", width=6,
                    command=lambda: self.delta_lower_threshold_var.set("")).pack(side=tk.LEFT, padx=2)
@@ -715,7 +720,8 @@ class OptionsMonitorGUI:
         delta_remark_frame = ttk.Frame(delta_frame)
         delta_remark_frame.pack(fill='x', padx=5, pady=2)
         ttk.Label(delta_remark_frame, text="Remark:").pack(side=tk.LEFT)
-        self.delta_remark_var = tk.StringVar(value="")
+        # Keep existing StringVar; avoid re-binding
+        self.delta_remark_var.set(self.delta_remark_var.get())
         ttk.Entry(delta_remark_frame, textvariable=self.delta_remark_var, width=30).pack(side=tk.LEFT, padx=2, fill='x', expand=True)
         
         # Save/Load buttons
@@ -876,23 +882,36 @@ class OptionsMonitorGUI:
             messagebox.showerror("Error", "Position not found")
             return
         
-        # Load values into input fields
+        # Load values into input fields based on position type
+        position_type = position.get("position_type", "OPTION")
         user_inputs = position["user_inputs"]
-        self.market_var.set(user_inputs["market"])
-        self.ticker_var.set(user_inputs["ticker"])
-        self.strike_var.set(str(user_inputs["strike"]))
-        self.option_type_var.set("CALL" if user_inputs["type"] == "C" else "PUT")
+        self.market_var.set(user_inputs.get("market", "US"))
+        self.ticker_var.set(user_inputs.get("ticker", ""))
         self.quantity_var.set(str(position["quantity"]))
         self.entry_cost_var.set(str(position["entry_cost"]))
         self.position_remark_var.set(position.get("remark", ""))
-        
-        # Set expiry date
-        try:
-            expiry_date = datetime.strptime(user_inputs["expiry"], "%Y-%m-%d")
+        self.position_type_var.set(position_type)
+        if position_type == "OPTION":
+            self.strike_var.set(str(user_inputs.get("strike", "")))
+            self.option_type_var.set("CALL" if user_inputs.get("type", "C") == "C" else "PUT")
+            # Set expiry date
+            try:
+                expiry_val = user_inputs.get("expiry", "")
+                if expiry_val:
+                    expiry_date = datetime.strptime(expiry_val, "%Y-%m-%d")
+                    self.expiry_entry.entry.delete(0, tk.END)
+                    self.expiry_entry.entry.insert(0, expiry_date.strftime("%Y-%m-%d"))
+            except Exception:
+                pass
+        else:  # STOCK
+            # Clear option-specific fields and set short rate if present
+            self.strike_var.set("")
             self.expiry_entry.entry.delete(0, tk.END)
-            self.expiry_entry.entry.insert(0, expiry_date.strftime("%Y-%m-%d"))
-        except:
-            pass
+            self.option_type_var.set("CALL")
+            try:
+                self.short_rate_var.set(str(user_inputs.get("short_rate", "0.0")))
+            except Exception:
+                self.short_rate_var.set("0.0")
         
         # Remove the position so it can be re-added with new values
         self.positions = [p for p in self.positions if p["leg_number"] != leg_number]
@@ -1625,9 +1644,12 @@ class OptionsMonitorGUI:
             delta_lower_threshold = float(self.delta_lower_threshold_var.get()) if self.delta_lower_threshold_var.get().strip() else None
             
             # Calculate initial position value for percentage P&L calculation
+            # Use contract multiplier only for options; stocks use 1x
             initial_value = 0
             for pos_data in all_positions_data:
-                initial_value += abs(pos_data['quantity']) * pos_data['entry_cost'] * monitor.CONTRACT_MULTIPLIER
+                is_option = bool(pos_data.get('greeks_data', {}).get('option_code'))
+                multiplier = monitor.CONTRACT_MULTIPLIER if is_option else 1
+                initial_value += abs(pos_data['quantity']) * pos_data['entry_cost'] * multiplier
             
             # Check P&L thresholds
             current_pnl = combined_summary['portfolio_pnl']
